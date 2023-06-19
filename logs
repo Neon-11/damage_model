@@ -1,0 +1,112 @@
+for constraints: (assuming |p| > r1)
+self.equations["f"] = self.equations["p"] - r1 + r2*(f.diff(t)): line 92 @ phi_beta_model.py
+
+log:
+[16:38:39] - JIT using the NVFuser TorchScript backend
+[16:38:39] - JitManager: {'_enabled': True, '_arch_mode': <JitArchMode.ONLY_ACTIVATION: 1>, '_use_nvfuser': True, '_autograd_nodes': False}
+[16:38:39] - GraphManager: {'_func_arch': False, '_debug': False, '_func_arch_allow_partial_hessian': True}
+[16:38:50] - Installed PyTorch version 2.0.1+cu117 is not TorchScript supported in Modulus. Version 1.14.0a0+410ce96 is officially supported.
+[16:38:50] - attempting to restore from: outputs/damage_model
+[16:38:50] - Success loading optimizer: outputs/damage_model/optim_checkpoint.0.pth
+[16:38:50] - Success loading model: outputs/damage_model/virtual_work_model.0.pth
+[16:38:55] - [step:       1000] saved checkpoint to outputs/damage_model
+[16:38:55] - [step:       1000] loss:  5.511e-02
+[16:38:58] - Attempting cuda graph building, this may take a bit...
+[16:39:12] - [step:       1100] loss:  4.598e-02, time/iteration:  1.693e+02 ms
+
+Inference: Training Sucessful
+
+-----------------------------------------------------------------------------------------------------------------------------------------------------
+
+for constarint: (general case, max(|p| - r_{1}, 0) + r_{2}*f_dot = 0)
+self.equations["f"] = Max((Max(self.equations["p"], -1*self.equations["p"]) - r1), 0) - r1 + r2*(f.diff(t)): line 93 @ phi_beta_model.py
+
+log:
+[16:39:55] - JIT using the NVFuser TorchScript backend
+[16:39:55] - JitManager: {'_enabled': True, '_arch_mode': <JitArchMode.ONLY_ACTIVATION: 1>, '_use_nvfuser': True, '_autograd_nodes': False}
+[16:39:55] - GraphManager: {'_func_arch': False, '_debug': False, '_func_arch_allow_partial_hessian': True}
+[16:40:06] - Installed PyTorch version 2.0.1+cu117 is not TorchScript supported in Modulus. Version 1.14.0a0+410ce96 is officially supported.
+[16:40:06] - attempting to restore from: outputs/damage_model
+[16:40:06] - Success loading optimizer: outputs/damage_model/optim_checkpoint.0.pth
+[16:40:06] - Success loading model: outputs/damage_model/virtual_work_model.0.pth
+[16:40:12] - [step:       1000] saved checkpoint to outputs/damage_model
+[16:40:12] - [step:       1000] loss:  7.462e-02
+[16:40:15] - Attempting cuda graph building, this may take a bit...
+Error executing job with overrides: []
+Traceback (most recent call last):
+  File "/home/neo11/anaconda3/envs/test_env/lib/python3.8/site-packages/modulus/sym/trainer.py", line 742, in _cuda_graph_training_step
+    self.loss_static, self.losses_static = self.compute_gradients(
+  File "/home/neo11/anaconda3/envs/test_env/lib/python3.8/site-packages/modulus/sym/trainer.py", line 68, in adam_compute_gradients
+    losses_minibatch = self.compute_losses(step)
+  File "/home/neo11/anaconda3/envs/test_env/lib/python3.8/site-packages/modulus/sym/solver/solver.py", line 66, in compute_losses
+    return self.domain.compute_losses(step)
+  File "/home/neo11/anaconda3/envs/test_env/lib/python3.8/site-packages/modulus/sym/domain/domain.py", line 147, in compute_losses
+    constraint.forward()
+  File "/home/neo11/anaconda3/envs/test_env/lib/python3.8/site-packages/modulus/sym/domain/constraint/continuous.py", line 130, in forward
+    self._output_vars = self.model(self._input_vars)
+  File "/home/neo11/anaconda3/envs/test_env/lib/python3.8/site-packages/torch/nn/modules/module.py", line 1501, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/neo11/anaconda3/envs/test_env/lib/python3.8/site-packages/modulus/sym/graph.py", line 234, in forward
+    outvar.update(e(outvar))
+  File "/home/neo11/anaconda3/envs/test_env/lib/python3.8/site-packages/torch/nn/modules/module.py", line 1501, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/neo11/anaconda3/envs/test_env/lib/python3.8/site-packages/modulus/sym/utils/sympy/torch_printer.py", line 288, in forward
+    output = self.torch_expr(args)
+  File "<lambdifygenerated-13>", line 3, in _lambdifygenerated
+    return (-10000.0*d__t + Max(0, Max(-10*d__x__x - 10*d__y__y - 0.5*sigma_xx*u__x - 0.5*sigma_xy*v__x - 0.5*sigma_yy*v__y, 10*d__x__x + 10*d__y__y + 0.5*sigma_xx*u__x + 0.5*sigma_xy*v__x + 0.5*sigma_yy*v__y) - 10000.0) - 10000.0)
+  File "/home/neo11/anaconda3/envs/test_env/lib/python3.8/site-packages/modulus/sym/utils/sympy/torch_printer.py", line 154, in _max_torch
+    value = (torch.zeros(tensor_shape) + value).to(device)
+RuntimeError: CUDA error: operation not permitted when stream is capturing
+CUDA kernel errors might be asynchronously reported at some other API call, so the stacktrace below might be incorrect.
+For debugging consider passing CUDA_LAUNCH_BLOCKING=1.
+Compile with `TORCH_USE_CUDA_DSA` to enable device-side assertions.
+
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "damage_model.py", line 242, in run
+    slv.solve()
+  File "/home/neo11/anaconda3/envs/test_env/lib/python3.8/site-packages/modulus/sym/solver/solver.py", line 173, in solve
+    self._train_loop(sigterm_handler)
+  File "/home/neo11/anaconda3/envs/test_env/lib/python3.8/site-packages/modulus/sym/trainer.py", line 535, in _train_loop
+    loss, losses = self._cuda_graph_training_step(step)
+  File "/home/neo11/anaconda3/envs/test_env/lib/python3.8/site-packages/modulus/sym/trainer.py", line 742, in _cuda_graph_training_step
+    self.loss_static, self.losses_static = self.compute_gradients(
+  File "/home/neo11/anaconda3/envs/test_env/lib/python3.8/site-packages/torch/cuda/graphs.py", line 173, in __exit__
+    self.cuda_graph.capture_end()
+  File "/home/neo11/anaconda3/envs/test_env/lib/python3.8/site-packages/torch/cuda/graphs.py", line 79, in capture_end
+    super().capture_end()
+RuntimeError: CUDA error: operation failed due to a previous error during capture
+CUDA kernel errors might be asynchronously reported at some other API call, so the stacktrace below might be incorrect.
+For debugging consider passing CUDA_LAUNCH_BLOCKING=1.
+Compile with `TORCH_USE_CUDA_DSA` to enable device-side assertions.
+
+I have tried the suggesstions as well but that not helping even so.
+
+Inference: Problems faced with inequalities and Max operation of SymPy
+
+--------------------------------------------------------------------------------------------------------------------------------------------------------
+After calling for the equations from the Model2D class, the error is:
+
+  ret = run_job(
+Error executing job with overrides: []
+Traceback (most recent call last):
+  File "damage_model.py", line 220, in run
+    DM1 = PointwiseInteriorConstraint(
+  File "/home/neo11/anaconda3/envs/test_env/lib/python3.8/site-packages/modulus/sym/domain/constraint/continuous.py", line 444, in __init__
+    invar = geometry.sample_interior(
+  File "/home/neo11/anaconda3/envs/test_env/lib/python3.8/site-packages/modulus/sym/geometry/geometry.py", line 614, in sample_interior
+    criteria_index, criteria(local_invar, local_params)
+  File "/home/neo11/anaconda3/envs/test_env/lib/python3.8/site-packages/modulus/sym/geometry/helper.py", line 89, in criteria
+    return fn_criteria(**inputs)
+  File "/home/neo11/anaconda3/envs/test_env/lib/python3.8/site-packages/modulus/sym/utils/sympy/numpy_printer.py", line 158, in grouped_lambda
+    output.append(lambdify_f_i(**invar))
+  File "/home/neo11/anaconda3/envs/test_env/lib/python3.8/site-packages/modulus/sym/utils/sympy/numpy_printer.py", line 142, in lambdify_f_i
+    v = sp_lambdify_f_i(**x)
+  File "<lambdifygenerated-15>", line 8, in _lambdifygenerated
+    less(-0.5*sigma_xx(x, y, t)*Derivative(u(x, y, t), x) - 0.5*sigma_xy(x, y, t)*Derivative(v(x, y, t), x) - 0.5*sigma_yy(x, y, t)*Derivative(v(x, y, t), y) - 10*Derivative(d(x, y, t), (x, 2)) - 10*Derivative(d(x, y, t), (y, 2)), 10000.0))
+NameError: name 'sigma_xx' is not defined
+
+
+The issue is with case type damage modelling, there the criteria is note been abled to be utilized efficiently
