@@ -88,7 +88,7 @@ LE setup:
 # asumming 2D: planar stress state
 
 # create run; setup the config filesconda 
-@modulus.sym.main(config_path="conf", config_name="config")
+@modulus.sym.main(config_path="conf1", config_name="config")
 def run(cfg: ModulusConfig) -> None:
     lambda_ = nu * E / ((1 + nu) * (1 - 2 * nu))  # Pa
     mu_real = E / (2 * (1 + nu))  # Pa
