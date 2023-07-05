@@ -279,8 +279,8 @@ def run(cfg: ModulusConfig) -> None:
     win_domain.add_constraint(Interior, "governing_equations_windows")
     ic_domain.add_constraint(Interior, "governing_equations_interior")
 
-    nx = 20
-    ny = 110
+    nx = 200
+    ny = 1100
 
     # adding the time_inferencer as we need to store the time varied results
     # add inference data for time slices
