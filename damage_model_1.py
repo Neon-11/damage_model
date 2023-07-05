@@ -121,12 +121,20 @@ def run(cfg: ModulusConfig) -> None:
     bounds_y = (panel_origin[1], panel_origin[1] + panel_dim[1])
 
     # bound on time scale
-    bounds_t = (0, 1.0)
+    bounds_t = (0.0, 1.0)
+
+    # how many windows required
+    nr_time_windows = 10
 
     # time scales with we are working
-    time_window_size = 0.1
-    nr_time_windows = int(bounds_t[1]/time_window_size)
+    time_window_size = bounds_t[1]/nr_time_windows
+
+    # bound of time intervals
     time_range = {t : bounds_t}
+
+    # DOMAIN
+    ic_domain = Domain("Initial_conditions")
+    win_domain = Domain("window")
 
     # setp model
     NN = instantiate_arch(
@@ -147,14 +155,56 @@ def run(cfg: ModulusConfig) -> None:
             cfg=cfg.arch.fully_connected, # change size from the config.yaml
             activation_fn=Activation.TANH,   
         ) 
-      
+    
+    # generate the NN
     time_window_net = MovingTimeWindowArch(NN, time_window_size)
 
+    # generate the nodes for the NN
     nodes = Equations.make_nodes() + [time_window_net.make_node(name="transient_time_net")]
 
-    # DOMAIN
-    ic_domain = Domain("Initial_conditions")
-    win_domain = Domain("window")
+    # setting the intial conditions only in the domain of intial conditions
+    # initial condition @t = 0 => d = 0
+    IC = PointwiseInteriorConstraint(
+        nodes = nodes,
+        geometry = geo,
+        outvar={"u": 0.0, "v":0.0, "d": 0.0},
+        batch_size=cfg.batch_size.lr_interior,
+        # criteria = Eq(t, bounds_t[0]),
+        bounds={x: bounds_x, y: bounds_y},
+        lambda_weighting={"u": 1.0, "v": 1.0, "d": 1.0},
+        parameterization={t : 0.0},
+        batch_per_epoch=500,
+    )
+    # only intiallly (t=0)
+    ic_domain.add_constraint(IC, "IC")
+
+    # make constraint for matching previous windows initial condition
+    # output of n window = input of (n+1) window
+    window_ic = PointwiseInteriorConstraint(
+        nodes=nodes,
+        geometry=geo,
+        outvar={
+            "u_prev_step_diff": 0,
+            "v_prev_step_diff": 0, 
+            "d_prev_step_diff": 0,
+            "sigma_xx_prev_step_diff":0, 
+            "sigma_xy_prev_step_diff":0, 
+            "sigma_yy_prev_step_diff":0
+        },
+        batch_size=cfg.batch_size.lr_interior,
+        bounds={x: bounds_x, y: bounds_y},
+        lambda_weighting={
+            "u_prev_step_diff": 1.0,
+            "v_prev_step_diff": 1.0,
+            "d_prev_step_diff": 1.0,
+            "sigma_xx_prev_step_diff":1.0,
+            "sigma_xy_prev_step_diff":1.0,
+            "sigma_yy_prev_step_diff":1.0
+        },
+        parameterization={t: 0},
+    )
+    # for any window in consideration
+    win_domain.add_constraint(window_ic, name="window_ic")
 
     # Boundary conditions and Initial Conditions
     # left wall: no force / tractions, free surface
@@ -167,6 +217,8 @@ def run(cfg: ModulusConfig) -> None:
             parameterization={t: bounds_t, x:panel_origin[0]}, # t is a sympy symbol!!
             batch_per_epoch=500,
         )
+    # holds always
+    ic_domain.add_constraint(panel_left_1, "panel_left_1")
     win_domain.add_constraint(panel_left_1, "panel_left_1")
 
     panel_left_2 = PointwiseBoundaryConstraint(
@@ -178,6 +230,8 @@ def run(cfg: ModulusConfig) -> None:
             parameterization={t: bounds_t, (x - circle1_origin[0])**2 + (y - circle1_origin[1])**2 : circle_radius**2}, # t is a sympy symbol!!
             batch_per_epoch=500,
         )
+    # hold always
+    ic_domain.add_constraint(panel_left_1, "panel_left_2")
     win_domain.add_constraint(panel_left_2, "panel_left_2")
 
     # right wall
@@ -190,6 +244,7 @@ def run(cfg: ModulusConfig) -> None:
             parameterization={t: bounds_t, x:(panel_origin[0] + panel_dim[0])}, # parametric terms
             batch_per_epoch=500,
         )
+    ic_domain.add_constraint(panel_right_1, "panel_right_1")
     win_domain.add_constraint(panel_right_1, "panel_right_1")
 
     panel_right_2 = PointwiseBoundaryConstraint(
@@ -201,6 +256,7 @@ def run(cfg: ModulusConfig) -> None:
             parameterization={t: bounds_t, (x - circle2_origin[0])**2 + (y - circle2_origin[1])**2 : circle_radius**2}, # parametric terms
             batch_per_epoch=500,
         )
+    ic_domain.add_constraint(panel_right_1, "panel_right_2")
     win_domain.add_constraint(panel_right_2, "panel_right_2")
 
     # bottom wall
@@ -213,6 +269,7 @@ def run(cfg: ModulusConfig) -> None:
             parameterization={t: bounds_t, y: panel_origin[1]}, # t is a sympy symbol!!
             batch_per_epoch=500,
         )
+    ic_domain.add_constraint(panel_bottom, "panel_bottom")
     win_domain.add_constraint(panel_bottom, "panel_bottom")
 
     # top wall
@@ -227,21 +284,8 @@ def run(cfg: ModulusConfig) -> None:
             batch_per_epoch=500,
             
         )
+    ic_domain.add_constraint(panel_top, "panel_top")
     win_domain.add_constraint(panel_top, "panel_top")
-
-    # initial condition @t = 0 => d = 0
-    IC = PointwiseInteriorConstraint(
-        nodes = nodes,
-        geometry = geo,
-        outvar={"d": 0.0},
-        batch_size=cfg.batch_size.lr_interior,
-        # criteria = Eq(t, bounds_t[0]),
-        # bounds={x: bounds_x, y: bounds_y},
-        lambda_weighting={"d": 10.0},
-        parameterization={t : 0.0},
-        batch_per_epoch=500,
-    )
-    ic_domain.add_constraint(IC, "IC")
 
     # constarints to be hold: interior
     Interior = PointwiseInteriorConstraint(
@@ -268,15 +312,16 @@ def run(cfg: ModulusConfig) -> None:
         parameterization=time_range,
         batch_per_epoch=500,
     )
-    win_domain.add_constraint(Interior, "governing_equations_windows")
-    ic_domain.add_constraint(Interior, "governing_equations_interior")
+    win_domain.add_constraint(Interior, "Interior")
+    ic_domain.add_constraint(Interior, "Interior")
 
     nx = 40
     ny = 110
 
     # adding the time_inferencer as we need to store the time varied results
     # add inference data for time slices
-    for i, specific_time in enumerate(np.linspace(0, time_window_size, nr_time_windows)):
+    # numpy.linspace(start, stop, num=50, endpoint=True, retstep=False, dtype=None, axis=0)
+    for i, specific_time in enumerate(np.linspace(0, bounds_t[1], nr_time_windows)):
         vtk_obj = VTKUniformGrid(
             # give the geometric bounds below
             bounds=[bounds_x, bounds_y],
@@ -288,15 +333,15 @@ def run(cfg: ModulusConfig) -> None:
         grid_inference = PointVTKInferencer(
             vtk_obj=vtk_obj,
             nodes=nodes,
-            input_vtk_map={"x": "x", "y": "y"},
+            input_vtk_map={"x": "x", "y": "y"}, # geometry
             output_names=["u", "v", "d", "f"],
             # requires_grad=False,
             # create the time varible at instant that would be constant
             invar={"t": np.full([nx*ny, 1], specific_time)},
             batch_size=1000,
         )
-        ic_domain.add_inferencer(grid_inference, name = "time = {} , slice = {}".format(str(specific_time), str(i).zfill(4)))
-        win_domain.add_inferencer(grid_inference, name = "time = {} , slice = {}".format(str(specific_time), str(i).zfill(4)))
+        ic_domain.add_inferencer(grid_inference, name="time_slice_" + str(i).zfill(3) + "_&_actual_time = " + str(specific_time))
+        win_domain.add_inferencer(grid_inference, name="time_slice_" + str(i).zfill(3) + "_&_actual_time = " + str(specific_time))
 
     # make solver
     slv = SequentialSolver(cfg, [(1, ic_domain), (nr_time_windows, win_domain)], custom_update_operation = time_window_net.move_window)
